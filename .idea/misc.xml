@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectResources">
+    <resource url="" location="$PROJECT_DIR$/../prix-core/backend/etl/extract/opentravel_schema/OTA_CommonTypes.xsd" />
+  </component>
+  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.5 (python-interview)" project-jdk-type="Python SDK" />
+</project>
