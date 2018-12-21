@@ -7,13 +7,10 @@
 A booking curve for a specific reserved night date is the graph which shows our
 customers the cumulative sum of occupancy or revenue over time.
 
-(example [purple line is the booking curve]: https://drive.google.com/file/d/10NYdhUqd0aBM4oqYij35kTntT0qDH5zO)
-
 ### Task 
 
 Finish the booking curve endpoint, located in the `app.py` file at the bottom, to return two booking curves for a specific
-hotel room and reserved_night_date. The first booking curve should be an occupancy curve (expressed as a percentage) 
-and the second should be a revenue booking curve showing the cumulative sum of revenue over time.
+hotel room and reserved_night_date. The first booking curve should be an occupancy curve (expressed as a percentage, showing the cumulative sum of occupancy over time) and the second should be a revenue booking curve showing the cumulative sum of revenue over time.
 
 We want the curve to go back in time 90 days and any booking prior to 90 days should be considered also (by including them with the results of the bookings at 90 days ago)
 
