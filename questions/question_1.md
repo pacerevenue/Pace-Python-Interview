@@ -41,6 +41,8 @@ The first task in this question is to create a database model in the `models.py`
 
 Next this table should be used to update the exisiting `/occupancy` endpoint in `app.py` to return the actual real occupancy with the blocked rooms took into consideration.
 
+Your solution should work for a range of dates (the endpoint allows a start date and end date to specified). In the example below we are just showing you the result of picking start_date = end_date but in this test start_date and end_date can be different.
+
 
 #### Hint
 
