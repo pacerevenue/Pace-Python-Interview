@@ -33,7 +33,7 @@ class OccupancyEndpoint(Resource):
         hotelroom = session.query(HotelRooms).get(hotelroom_id)
 
         # get number of bookings and cancellations
-        num_of_bookings = session.query(func.count(Bookings)).filter(
+        num_of_bookings = session.query(func.count(Bookings.id)).filter(
             and_(
                 Bookings.hotelroom_id == hotelroom_id,
                 Bookings.reserved_night_date.between(
@@ -41,8 +41,8 @@ class OccupancyEndpoint(Resource):
                 ),
                 Bookings.row_type == 'booking'
             )
-        ).all()
-        num_of_cancellations = session.query(func.Count(Bookings)).filter(
+        ).scalar()
+        num_of_cancellations = session.query(func.Count(Bookings.id)).filter(
             and_(
                 Bookings.hotelroom_id == hotelroom_id,
                 Bookings.reserved_night_date.between(
@@ -50,7 +50,7 @@ class OccupancyEndpoint(Resource):
                 ),
                 Bookings.row_type == 'cancellations'
             )
-        ).all()
+        ).scalar()
 
         # calculate numerator and denominator for occupancy
         net_bookings = num_of_bookings - num_of_cancellations
