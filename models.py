@@ -40,3 +40,15 @@ class Bookings(Base):
     row_type = Column(Text, nullable=False)
 
     price = Column(Numeric(10, 2), nullable=False)
+
+
+class BlockedRooms(Base):
+    __tablename__ = 'blockedrooms'
+    id = Column(Integer, primary_key=True)
+
+    hotelroom_id = Column(Integer, ForeignKey('hotelrooms.id'), nullable=False, index=True)
+    hotelroom = relationship("HotelRooms", primaryjoin=hotelroom_id == HotelRooms.id)
+
+    reserved_night_date = Column(Date, nullable=False)
+
+    rooms = Column(Integer, nullable=False)

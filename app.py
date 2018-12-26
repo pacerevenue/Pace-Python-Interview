@@ -1,10 +1,14 @@
-from datetime import datetime
+from datetime import date, datetime, timedelta
+from decimal import Decimal
+from collections import Counter, defaultdict
+import itertools
+import operator
 
-from flask import Flask
+from flask import Flask, request
 from flask_restplus import Api, Resource
 from sqlalchemy import and_, func
 
-from models import Bookings, HotelRooms, Hotels
+from models import BlockedRooms, Bookings, HotelRooms, Hotels
 from utils import get_session
 
 app = Flask(__name__)
@@ -33,7 +37,7 @@ class OccupancyEndpoint(Resource):
         hotelroom = session.query(HotelRooms).get(hotelroom_id)
 
         # get number of bookings and cancellations
-        num_of_bookings = session.query(func.count(Bookings)).filter(
+        num_of_bookings = session.query(func.count(Bookings.id)).filter(
             and_(
                 Bookings.hotelroom_id == hotelroom_id,
                 Bookings.reserved_night_date.between(
@@ -41,8 +45,8 @@ class OccupancyEndpoint(Resource):
                 ),
                 Bookings.row_type == 'booking'
             )
-        ).all()
-        num_of_cancellations = session.query(func.Count(Bookings)).filter(
+        ).scalar()
+        num_of_cancellations = session.query(func.Count(Bookings.id)).filter(
             and_(
                 Bookings.hotelroom_id == hotelroom_id,
                 Bookings.reserved_night_date.between(
@@ -50,10 +54,22 @@ class OccupancyEndpoint(Resource):
                 ),
                 Bookings.row_type == 'cancellations'
             )
-        ).all()
+        ).scalar()
+        num_of_blocked_rooms = session.query(func.Sum(BlockedRooms.rooms)).filter(
+            and_(
+                BlockedRooms.hotelroom_id == hotelroom_id,
+                BlockedRooms.reserved_night_date.between(
+                    start_date, end_date
+                ),
+            )
+        ).scalar()
+
+        num_of_bookings = num_of_bookings or 0
+        num_of_cancellations = num_of_cancellations or 0
+        num_of_blocked_rooms = num_of_blocked_rooms or 0
 
         # calculate numerator and denominator for occupancy
-        net_bookings = num_of_bookings - num_of_cancellations
+        net_bookings = num_of_blocked_rooms + num_of_bookings - num_of_cancellations
         total_available_rooms = hotelroom.capacity * ((end_date - start_date).days + 1)
 
         # check to make sure total_available_rooms is not 0 (division by zero error)
@@ -86,14 +102,74 @@ class BookingCurveEndpoint(Resource):
         # get a database session
         session = get_session()
 
-        occupancy = []
-        revenue_booking_curve = []
+        # get the hotelroom object to calculate capacity
+        hotelroom = session.query(HotelRooms).get(hotelroom_id)
 
-        # write code here for Question 2
+        days = request.args.get("days", 90)
+        today = date.today()
+        start_date = today - timedelta(days=days-1)
+
+        # bookings for the given room made prior the curve start date
+        prior_occupancy, prior_revenue = session.query(
+            func.count(Bookings.id),
+            func.sum(Bookings.price),
+        ).filter(
+            and_(
+                Bookings.hotelroom_id == hotelroom_id,
+                Bookings.reserved_night_date == reserved_night_date,
+                Bookings.booking_datetime < start_date,
+            )
+        ).one()
+
+        # bookings for the given room made within the curve date range
+        bookings = session.query(
+            Bookings.booking_datetime,
+            Bookings.price,
+        ).filter(
+            and_(
+                Bookings.hotelroom_id == hotelroom_id,
+                Bookings.reserved_night_date == reserved_night_date,
+                Bookings.booking_datetime >= start_date
+            )
+        ).all()
+
+        # get occupancy and revenue per day out of existing bookings
+        occupancy_per_day = Counter(
+            [booking.booking_datetime.date() for booking in bookings]
+        )
+        revenue_per_day = defaultdict(Decimal)
+        for booking in bookings:
+            revenue_per_day[booking.booking_datetime.date()] += booking.price
+
+        # occupancy and revenue per each day of the range
+        # (including days with no bookings)
+        occupancy_per_day = [
+            occupancy_per_day.get(today - timedelta(days=day), 0)
+            for day in reversed(range(days))
+        ]
+        revenue_per_day = [
+            revenue_per_day.get(today - timedelta(days=day), 0)
+            for day in reversed(range(days))
+        ]
+
+        # account for prior occupancy and revenue
+        occupancy_per_day[0] += prior_occupancy
+        revenue_per_day[0] += prior_revenue
+
+        # accumulate occupancy and calculate percentage
+        occupancy_percentage = [
+            str(round(occupancy * 100 / hotelroom.capacity, 2))
+            for occupancy
+            in itertools.accumulate(occupancy_per_day, func=operator.add)
+        ]
+        # accumulate revenue
+        revenue_booking_curve = list(
+            itertools.accumulate(revenue_per_day, func=operator.add)
+        )
 
         return {
             'booking_curve': {
-                "occupancy": occupancy,
+                "occupancy": occupancy_percentage,
                 "revenue": revenue_booking_curve
             }
         }
