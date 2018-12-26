@@ -51,9 +51,18 @@ class OccupancyEndpoint(Resource):
                 Bookings.row_type == 'cancellations'
             )
         ).scalar()
+        num_of_blocked_slots = session.query(func.Count(Bookings.id)).filter(
+            and_(
+                Bookings.hotelroom_id == hotelroom_id,
+                Bookings.reserved_night_date.between(
+                    start_date, end_date
+                ),
+                Bookings.row_type == 'block'
+            )
+        ).scalar()
 
         # calculate numerator and denominator for occupancy
-        net_bookings = num_of_bookings - num_of_cancellations
+        net_bookings = num_of_blocked_slots + num_of_bookings - num_of_cancellations
         total_available_rooms = hotelroom.capacity * ((end_date - start_date).days + 1)
 
         # check to make sure total_available_rooms is not 0 (division by zero error)
