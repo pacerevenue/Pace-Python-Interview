@@ -98,6 +98,9 @@ class BookingCurveEndpoint(Resource):
         # get a database session
         session = get_session()
 
+        # get the hotelroom object to calculate capacity
+        hotelroom = session.query(HotelRooms).get(hotelroom_id)
+
         days = request.args.get("days", 90)
         today = date.today()
         start_date = today - timedelta(days=days-1)
@@ -133,16 +136,18 @@ class BookingCurveEndpoint(Resource):
         ]
         # add prior occupancy
         occupancy_per_day[0] += prior_occupancy
-        # accumulate occupancy curve
-        occupancy = list(
-            itertools.accumulate(occupancy_per_day, func=operator.add)
-        )
+        # accumulate occupancy and calculate percentage
+        occupancy_percentage = [
+            str(round(occupancy * 100 / hotelroom.capacity, 2))
+            for occupancy
+            in itertools.accumulate(occupancy_per_day, func=operator.add)
+        ]
 
         revenue_booking_curve = []
 
         return {
             'booking_curve': {
-                "occupancy": occupancy,
+                "occupancy": occupancy_percentage,
                 "revenue": revenue_booking_curve
             }
         }
