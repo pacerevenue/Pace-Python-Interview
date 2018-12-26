@@ -100,13 +100,25 @@ class BookingCurveEndpoint(Resource):
 
         days = request.args.get("days", 90)
         today = date.today()
+        start_date = today - timedelta(days=days-1)
+
+        # bookings made prior the curve start date
+        prior_occupancy = session.query(
+            func.count(Bookings.id)
+        ).filter(
+            and_(
+                Bookings.hotelroom_id == hotelroom_id,
+                Bookings.reserved_night_date == reserved_night_date,
+                Bookings.booking_datetime < start_date,
+            )
+        ).scalar()
 
         # bookings for the given room and the last 90 days
         bookings = session.query(Bookings.booking_datetime).filter(
             and_(
                 Bookings.hotelroom_id == hotelroom_id,
                 Bookings.reserved_night_date == reserved_night_date,
-                Bookings.booking_datetime >= today - timedelta(days=days),
+                Bookings.booking_datetime >= start_date
             )
         ).all()
 
@@ -119,6 +131,8 @@ class BookingCurveEndpoint(Resource):
             occupancy_per_day.get(today - timedelta(days=day), 0)
             for day in reversed(range(days))
         ]
+        # add prior occupancy
+        occupancy_per_day[0] += prior_occupancy
         # accumulate occupancy curve
         occupancy = list(
             itertools.accumulate(occupancy_per_day, func=operator.add)

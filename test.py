@@ -153,6 +153,10 @@ def test_booking_curve_occupancy(
         db_session.add_all(bookings)
         db_session.commit()
 
+    # bookings prior the curve date range
+    make_bookings(4, booking_datetime=date(2018, 12, 21))
+
+    # bookings within the curve date range
     make_bookings(4, booking_datetime=date(2018, 12, 23))
     make_bookings(1, booking_datetime=date(2018, 12, 24))
     make_bookings(3, booking_datetime=date(2018, 12, 26))
@@ -161,6 +165,6 @@ def test_booking_curve_occupancy(
         hotelroom.id, reserved_night_date
     )
 
-    expected_occupancy_curve = [0, 4, 5, 5, 8]
+    expected_occupancy_curve = [4, 8, 9, 9, 12]
 
     assert response["booking_curve"]["occupancy"] == expected_occupancy_curve
