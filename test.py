@@ -228,4 +228,3 @@ def test_booking_curve_revenue(
     ]
 
     assert response["booking_curve"]["revenue"] == expected_revenue_curve
-

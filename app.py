@@ -109,7 +109,7 @@ class BookingCurveEndpoint(Resource):
         today = date.today()
         start_date = today - timedelta(days=days-1)
 
-        # bookings made prior the curve start date
+        # bookings for the given room made prior the curve start date
         prior_occupancy, prior_revenue = session.query(
             func.count(Bookings.id),
             func.sum(Bookings.price),
@@ -121,7 +121,7 @@ class BookingCurveEndpoint(Resource):
             )
         ).one()
 
-        # bookings for the given room and the last 90 days
+        # bookings for the given room made within the curve date range
         bookings = session.query(
             Bookings.booking_datetime,
             Bookings.price,
@@ -142,7 +142,7 @@ class BookingCurveEndpoint(Resource):
             revenue_per_day[booking.booking_datetime.date()] += booking.price
 
         # occupancy and revenue per each day of the range
-        # (including days with no booking)
+        # (including days with no bookings)
         occupancy_per_day = [
             occupancy_per_day.get(today - timedelta(days=day), 0)
             for day in reversed(range(days))
