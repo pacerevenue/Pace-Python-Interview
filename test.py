@@ -161,6 +161,6 @@ def test_booking_curve_occupancy(
         hotelroom.id, reserved_night_date
     )
 
-    expected_occupancy_curve = [0, 4, 1, 0, 3]
+    expected_occupancy_curve = [0, 4, 5, 5, 8]
 
     assert response["booking_curve"]["occupancy"] == expected_occupancy_curve

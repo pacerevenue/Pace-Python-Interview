@@ -1,5 +1,7 @@
 from datetime import date, datetime, timedelta
 from collections import Counter
+import itertools
+import operator
 
 from flask import Flask, request
 from flask_restplus import Api, Resource
@@ -99,6 +101,7 @@ class BookingCurveEndpoint(Resource):
         days = request.args.get("days", 90)
         today = date.today()
 
+        # bookings for the given room and the last 90 days
         bookings = session.query(Bookings.booking_datetime).filter(
             and_(
                 Bookings.hotelroom_id == hotelroom_id,
@@ -116,11 +119,12 @@ class BookingCurveEndpoint(Resource):
             occupancy_per_day.get(today - timedelta(days=day), 0)
             for day in reversed(range(days))
         ]
+        # accumulate occupancy curve
+        occupancy = list(
+            itertools.accumulate(occupancy_per_day, func=operator.add)
+        )
 
-        occupancy = occupancy_per_day
         revenue_booking_curve = []
-
-        # write code here for Question 2
 
         return {
             'booking_curve': {
