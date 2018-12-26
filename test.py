@@ -103,14 +103,13 @@ def test_occupancy_with_blocked_rooms(
     start_date = "2018-12-26"
     end_date = "2018-12-26"
 
-    blocked_rooms = [
-        make_booking(
-            id=i,
-            reserved_night_date=date(2018, 12, 26),
-            row_type="block"
-        ) for i in range(7, 11)
-    ]
-    db_session.add_all(blocked_rooms)
+    blocked_rooms = models.BlockedRooms(
+        id=1,
+        hotelroom_id=hotelroom.id,
+        reserved_night_date=date(2018, 12, 26),
+        rooms=4
+    )
+    db_session.add(blocked_rooms)
     db_session.commit()
 
     response = app.OccupancyEndpoint().get(

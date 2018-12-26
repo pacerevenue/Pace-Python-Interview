@@ -8,7 +8,7 @@ from flask import Flask, request
 from flask_restplus import Api, Resource
 from sqlalchemy import and_, func
 
-from models import Bookings, HotelRooms, Hotels
+from models import BlockedRooms, Bookings, HotelRooms, Hotels
 from utils import get_session
 
 app = Flask(__name__)
@@ -55,18 +55,21 @@ class OccupancyEndpoint(Resource):
                 Bookings.row_type == 'cancellations'
             )
         ).scalar()
-        num_of_blocked_slots = session.query(func.Count(Bookings.id)).filter(
+        num_of_blocked_rooms = session.query(func.Sum(BlockedRooms.rooms)).filter(
             and_(
-                Bookings.hotelroom_id == hotelroom_id,
-                Bookings.reserved_night_date.between(
+                BlockedRooms.hotelroom_id == hotelroom_id,
+                BlockedRooms.reserved_night_date.between(
                     start_date, end_date
                 ),
-                Bookings.row_type == 'block'
             )
         ).scalar()
 
+        num_of_bookings = num_of_bookings or 0
+        num_of_cancellations = num_of_cancellations or 0
+        num_of_blocked_rooms = num_of_blocked_rooms or 0
+
         # calculate numerator and denominator for occupancy
-        net_bookings = num_of_blocked_slots + num_of_bookings - num_of_cancellations
+        net_bookings = num_of_blocked_rooms + num_of_bookings - num_of_cancellations
         total_available_rooms = hotelroom.capacity * ((end_date - start_date).days + 1)
 
         # check to make sure total_available_rooms is not 0 (division by zero error)
