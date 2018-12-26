@@ -133,6 +133,7 @@ def request():
 def test_booking_curve_occupancy(
     db_session, request, hotelroom, make_booking
 ):
+    # TODO add also bookings for different room - should be filtered out
 
     # for testing shorten the 90 days default
     request.args = {"days": 5}
@@ -168,3 +169,64 @@ def test_booking_curve_occupancy(
     expected_occupancy_curve = ["20.0", "60.0", "70.0", "70.0", "100.0"]
 
     assert response["booking_curve"]["occupancy"] == expected_occupancy_curve
+
+
+def test_booking_curve_revenue(
+    db_session, request, hotelroom, make_booking
+):
+    # TODO add also bookings for different room - should be filtered out
+
+    # for testing shorten the 90 days default
+    request.args = {"days": 5}
+
+    reserved_night_date = date(2018, 12, 26)
+
+    ids = itertools.count()
+    bookings = []
+
+    def make_bookings(prices, **overrides):
+        bookings = [
+            make_booking(
+                id=next(ids),
+                reserved_night_date=reserved_night_date,
+                price=price,
+                **overrides
+            ) for price in prices
+        ]
+        db_session.add_all(bookings)
+        db_session.commit()
+
+    # bookings prior the curve date range
+    make_bookings(
+        ("100.0", "200.0"),
+        booking_datetime=date(2018, 12, 21)
+    )
+
+    # bookings within the curve date range
+    make_bookings(
+        ("100.0", "100.0", "100.0", "100.0"),
+        booking_datetime=date(2018, 12, 23)
+    )
+    make_bookings(
+        ("100.0",),
+        booking_datetime=date(2018, 12, 24)
+    )
+    make_bookings(
+        ("100.0", "100.0"),
+        booking_datetime=date(2018, 12, 26)
+    )
+
+    response = app.BookingCurveEndpoint().get(
+        hotelroom.id, reserved_night_date
+    )
+
+    expected_revenue_curve = [
+        Decimal("300.00"),
+        Decimal("700.00"),
+        Decimal("800.00"),
+        Decimal("800.00"),
+        Decimal("1000.00")
+    ]
+
+    assert response["booking_curve"]["revenue"] == expected_revenue_curve
+

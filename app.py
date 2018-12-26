@@ -1,5 +1,6 @@
 from datetime import date, datetime, timedelta
-from collections import Counter
+from decimal import Decimal
+from collections import Counter, defaultdict
 import itertools
 import operator
 
@@ -106,18 +107,22 @@ class BookingCurveEndpoint(Resource):
         start_date = today - timedelta(days=days-1)
 
         # bookings made prior the curve start date
-        prior_occupancy = session.query(
-            func.count(Bookings.id)
+        prior_occupancy, prior_revenue = session.query(
+            func.count(Bookings.id),
+            func.sum(Bookings.price),
         ).filter(
             and_(
                 Bookings.hotelroom_id == hotelroom_id,
                 Bookings.reserved_night_date == reserved_night_date,
                 Bookings.booking_datetime < start_date,
             )
-        ).scalar()
+        ).one()
 
         # bookings for the given room and the last 90 days
-        bookings = session.query(Bookings.booking_datetime).filter(
+        bookings = session.query(
+            Bookings.booking_datetime,
+            Bookings.price,
+        ).filter(
             and_(
                 Bookings.hotelroom_id == hotelroom_id,
                 Bookings.reserved_night_date == reserved_night_date,
@@ -125,25 +130,39 @@ class BookingCurveEndpoint(Resource):
             )
         ).all()
 
+        # get occupancy and revenue per day out of existing bookings
         occupancy_per_day = Counter(
             [booking.booking_datetime.date() for booking in bookings]
         )
-        # fill up occupancy per each day of the range
+        revenue_per_day = defaultdict(Decimal)
+        for booking in bookings:
+            revenue_per_day[booking.booking_datetime.date()] += booking.price
+
+        # occupancy and revenue per each day of the range
         # (including days with no booking)
         occupancy_per_day = [
             occupancy_per_day.get(today - timedelta(days=day), 0)
             for day in reversed(range(days))
         ]
-        # add prior occupancy
+        revenue_per_day = [
+            revenue_per_day.get(today - timedelta(days=day), 0)
+            for day in reversed(range(days))
+        ]
+
+        # account for prior occupancy and revenue
         occupancy_per_day[0] += prior_occupancy
+        revenue_per_day[0] += prior_revenue
+
         # accumulate occupancy and calculate percentage
         occupancy_percentage = [
             str(round(occupancy * 100 / hotelroom.capacity, 2))
             for occupancy
             in itertools.accumulate(occupancy_per_day, func=operator.add)
         ]
-
-        revenue_booking_curve = []
+        # accumulate revenue
+        revenue_booking_curve = list(
+            itertools.accumulate(revenue_per_day, func=operator.add)
+        )
 
         return {
             'booking_curve': {
