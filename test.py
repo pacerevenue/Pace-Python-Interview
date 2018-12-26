@@ -1,5 +1,7 @@
 from datetime import date
 from decimal import Decimal
+import itertools
+from unittest.mock import patch
 
 import pytest
 from sqlalchemy import create_engine
@@ -82,22 +84,22 @@ def bookings(db_session, make_booking):
     return bookings
 
 
-def test_occupancy(bookings):
+def test_occupancy(bookings, hotelroom):
 
-    hotelroom_id = 1,
     start_date = "2018-12-26"
     end_date = "2018-12-26"
 
     response = app.OccupancyEndpoint().get(
-        hotelroom_id, start_date, end_date
+        hotelroom.id, start_date, end_date
     )
 
     assert response["occupancy"] == "60.0"
 
 
-def test_occupancy_with_blocked_rooms(db_session, bookings, make_booking):
+def test_occupancy_with_blocked_rooms(
+    db_session, bookings, hotelroom, make_booking
+):
 
-    hotelroom_id = 1,
     start_date = "2018-12-26"
     end_date = "2018-12-26"
 
@@ -112,7 +114,53 @@ def test_occupancy_with_blocked_rooms(db_session, bookings, make_booking):
     db_session.commit()
 
     response = app.OccupancyEndpoint().get(
-        hotelroom_id, start_date, end_date
+        hotelroom.id, start_date, end_date
     )
 
     assert response["occupancy"] == "100.0"
+
+
+def test_occupancy_with_date_range():
+    pass
+
+
+@pytest.fixture
+def request():
+    with patch("app.request") as request:
+        yield request
+
+
+def test_booking_curve_occupancy(
+    db_session, request, hotelroom, make_booking
+):
+
+    # for testing shorten the 90 days default
+    request.args = {"days": 5}
+
+    reserved_night_date = date(2018, 12, 26)
+
+    ids = itertools.count()
+    bookings = []
+
+    def make_bookings(n, **overrides):
+        bookings = [
+            make_booking(
+                id=next(ids),
+                reserved_night_date=reserved_night_date,
+                **overrides
+            ) for i in range(n)
+        ]
+        db_session.add_all(bookings)
+        db_session.commit()
+
+    make_bookings(4, booking_datetime=date(2018, 12, 23))
+    make_bookings(1, booking_datetime=date(2018, 12, 24))
+    make_bookings(3, booking_datetime=date(2018, 12, 26))
+
+    response = app.BookingCurveEndpoint().get(
+        hotelroom.id, reserved_night_date
+    )
+
+    expected_occupancy_curve = [0, 4, 1, 0, 3]
+
+    assert response["booking_curve"]["occupancy"] == expected_occupancy_curve
